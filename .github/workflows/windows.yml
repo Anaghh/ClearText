@@ -1,0 +1,49 @@
+name: Windows preview
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: metadata
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content native/ClearText.cs -Raw), 'const string Version = "([^"]+)"').Groups[1].Value
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - run: .\build_windows.ps1
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClearText-Windows-x64
+          path: release/*
+  release:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ClearText-Windows-x64
+          path: release
+      - name: Publish preview release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: v${{ needs.build.outputs.version }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; increment VERSION for a new release."
+          else
+            gh release create "$TAG" release/* --target "$COMMIT" --title "ClearText $TAG" --generate-notes --prerelease
+          fi
