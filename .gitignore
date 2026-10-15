@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.build-tools/
+.design-cache/
+.local-tools/
+.venv/
+build/
+dist/
+release/
+previews/
+*.spec
+*.log
